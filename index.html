@@ -66,13 +66,13 @@ const TYPES = {
   bact:   {hp:1, speed:0.065, r:0.034, dmg:8,  pts:15, name:'แบคทีเรีย', split:true},
   virus:  {hp:3, speed:0.06,  r:0.038, dmg:12, pts:30, name:'ไวรัสเกราะเหล็ก'},
   minion: {hp:1, speed:0.09,  r:0.026, dmg:5,  pts:5,  name:'ลูกสมุน'},
-  boss:   {hp:28,speed:0.022, r:0.09,  dmg:40, pts:500,name:'จอมโรคห่า'},
+  boss:   {hp:36,speed:0.024, r:0.09,  dmg:40, pts:500,name:'จอมโรคห่า'},
 };
 const WAVES = [
-  {title:'ศึกที่ 1: ทัพเชื้อหวัด', fact:'เชื้อหวัดติดต่อทางละอองไอจาม ปิดปากเวลาไอนะ', mix:{cold:1}, n:14, gap:[2.0,1.1]},
-  {title:'ศึกที่ 2: กองทัพแบคทีเรีย', fact:'แบคทีเรียแบ่งตัวได้เร็วมาก ถ้าปล่อยไว้จะเพิ่มเป็นสองเท่า!', mix:{cold:0.5, bact:0.5}, n:18, gap:[1.6,0.9]},
-  {title:'ศึกที่ 3: ไวรัสเกราะเหล็ก', fact:'ไวรัสตัวเล็กมาก ต้องใช้กล้องจุลทรรศน์อิเล็กตรอนถึงจะเห็น', mix:{cold:0.35, bact:0.35, virus:0.3}, n:20, gap:[1.5,0.8]},
-  {title:'ศึกสุดท้าย: จอมโรคห่า!', fact:'ตามตำนาน พระเจ้าอู่ทองย้ายมาสร้างกรุงศรีอยุธยาเพราะหนีโรคระบาด', boss:true},
+  {title:'ศึกที่ 1: ทัพเชื้อหวัด', fact:'เชื้อหวัดติดต่อทางละอองไอจาม ปิดปากเวลาไอนะ', mix:{cold:1}, n:14, gap:[1.8,1.0], speed:1},
+  {title:'ศึกที่ 2: กองทัพแบคทีเรีย', fact:'แบคทีเรียแบ่งตัวได้เร็วมาก ถ้าปล่อยไว้จะเพิ่มเป็นสองเท่า!', mix:{cold:0.5, bact:0.5}, n:22, gap:[1.3,0.65], speed:1.15},
+  {title:'ศึกที่ 3: ไวรัสเกราะเหล็ก', fact:'ไวรัสตัวเล็กมาก ต้องใช้กล้องจุลทรรศน์อิเล็กตรอนถึงจะเห็น', mix:{cold:0.35, bact:0.35, virus:0.3}, n:30, gap:[1.0,0.4], speed:1.3, rush:true},
+  {title:'ศึกสุดท้าย: จอมโรคห่า!', fact:'ตามตำนาน พระเจ้าอู่ทองย้ายมาสร้างกรุงศรีอยุธยาเพราะหนีโรคระบาด', boss:true, speed:1.4},
 ];
 const ITEMS = {
   soap:    {name:'สบู่',      col:'#7be39a', fact:'ล้างมือด้วยสบู่ 20 วินาที ช่วยกำจัดเชื้อโรคได้!'},
@@ -86,7 +86,7 @@ let state = 'menu', lastT = 0, countdown = 0, lastBeep = 4;
 let wave = 0, waveT = 0, spawned = 0, nextSpawn = 0, intro = 0;
 let germs = [], items = [], particles = [], floaters = [], hands = [];
 let cityHP = 100, score = 0, kills = 0, combo = 0, comboT = 0, bestCombo = 0, rankShown = '';
-let bossKilled = false, shieldT = 0, slowT = 0, itemTimer = 8, fact = null, drumT = 0, shake = 0, cough = [0,0,0,0,0], boss = null;
+let rage = false, bossSpawnT = 0, bossKilled = false, shieldT = 0, slowT = 0, itemTimer = 8, fact = null, drumT = 0, shake = 0, cough = [0,0,0,0,0], boss = null;
 
 function resize(){
   DPR = Math.min(2, devicePixelRatio || 1); W = innerWidth; H = innerHeight;
@@ -140,7 +140,7 @@ window.startGame = ()=>{
   audio();
   germs = []; items = []; particles = []; floaters = []; boss = null;
   cityHP = 100; score = 0; kills = 0; combo = 0; bestCombo = 0; rankShown = '';
-  shieldT = 0; slowT = 0; itemTimer = 8; fact = null; wave = 0; WAVES.forEach(w => delete w.spawnedBoss); bossKilled = false;
+  shieldT = 0; slowT = 0; itemTimer = 8; fact = null; wave = 0; WAVES.forEach(w => delete w.spawnedBoss); bossKilled = false; rage = false; bossSpawnT = 0;
   state = 'countdown'; countdown = 3.999; lastBeep = 4;
   document.getElementById('start').classList.add('hidden');
   document.getElementById('end').classList.add('hidden');
@@ -158,7 +158,8 @@ function spawnGerm(type, at){
   if (side === 'left'){ x = -60; y = H*(0.62 + Math.random()*0.08); boat = Math.random() < 0.6; }
   else if (side === 'right'){ x = W + 60; y = H*(0.62 + Math.random()*0.08); boat = Math.random() < 0.6; }
   else { x = W*(0.1 + Math.random()*0.8); y = -60; fly = true; }
-  const g = {type, x, y, hp:T.hp, max:T.hp, r:T.r*u, sp:T.speed*u, boat, fly, t:0, ph:Math.random()*6, hitCD:0, flash:0, kx:0, ky:0, split:false};
+  const wsp = type === 'boss' ? 1 : ((WAVES[wave] && WAVES[wave].speed) || 1);
+  const g = {type, x, y, hp:T.hp, max:T.hp, r:T.r*u, sp:T.speed*u*wsp, boat, fly, t:0, ph:Math.random()*6, hitCD:0, flash:0, kx:0, ky:0, split:false};
   germs.push(g); return g;
 }
 function pickSide(){ const r = Math.random(); return r < 0.35 ? 'left' : r < 0.7 ? 'right' : 'top'; }
@@ -175,7 +176,8 @@ function updateGerms(dt){
     // แบคทีเรียแบ่งตัว
     if (TYPES[g.type].split && !g.split && g.t > 5){ g.split = true; const n = spawnGerm('bact', 'top'); n.x = g.x + g.r*2; n.y = g.y; n.split = true; n.t = 0; float(g.x, g.y - g.r*2, 'แบ่งตัว!', '#b48cff'); }
     // บอสเสกลูกสมุน
-    if (g.type === 'boss'){ g.summon = (g.summon || 2) - dt; if (g.summon <= 0){ g.summon = 3.2; for (let k=0;k<2;k++){ const m = spawnGerm('minion', 'top'); m.x = g.x + (k?1:-1)*g.r; m.y = g.y - g.r*0.5; } sfx.roar(); } }
+    if (g.type === 'boss' && !g.rage && g.hp <= g.max/2){ g.rage = true; g.sp *= 1.6; rage = true; shake = 0.8; sfx.roar(); banner = {text:'จอมโรคห่าคลั่งแล้ว!', sub:'ฟาดรัว ๆ เลย!', t:2.2}; }
+    if (g.type === 'boss'){ g.summon = (g.summon || 2) - dt; if (g.summon <= 0){ g.summon = g.rage ? 1.5 : 2.6; for (let k=0;k<(g.rage?3:2);k++){ const m = spawnGerm('minion', 'top'); m.x = g.x + (k-1)*g.r*1.1; m.y = g.y - g.r*0.5; } sfx.roar(); } }
     // ถึงเมือง
     if (d < c.rx*0.35 + g.r){
       if (g.type === 'boss'){ // บอสโดนกำแพงแล้วถอยกลับไปตั้งหลัก
@@ -277,11 +279,13 @@ function trackHands(now){
     h.vx = dt > 0.02 ? (b.x - a.x)/dt : 0; h.vy = dt > 0.02 ? (b.y - a.y)/dt : 0;
     h.speed = Math.hypot(h.vx, h.vy);
     h.trail.push({x:h.x, y:h.y, s:h.speed}); if (h.trail.length > 8) h.trail.shift();
+    const palm = h.pts ? Math.hypot(h.pts[0].x - h.pts[9].x, h.pts[0].y - h.pts[9].y) : 0;
+    h.hr = Math.max(Math.min(W,H)*0.031, palm*0.38); // วงฟาดกว้างเกือบเต็มฝ่ามือ
   }
 }
 function handleSwats(){
-  const hr = Math.min(W,H)*0.07;
   for (const h of hands){
+    const hr = h.hr || Math.min(W,H)*0.031;
     const fast = h.speed > W*0.25;
     for (const g of germs){
       if (Math.hypot(g.x - h.x, g.y - h.y) < hr + g.r){
@@ -386,7 +390,7 @@ function drawCity(t){
   ctx.fillStyle = '#5aa33e'; ctx.beginPath(); ctx.roundRect(c.x - c.rx, gy - c.ry*0.7, c.rx*2, 14, [40,40,0,0]); ctx.fill();
   // ปรางค์ 3 องค์
   const pw = c.rx*0.2, base = gy - c.ry*0.7;
-  prang(c.x - c.rx*0.5, base, pw*0.75); prang(c.x + c.rx*0.5, base, pw*0.75); prang(c.x, base, pw*1.05);
+  prang(c.x - c.rx*0.5, base, pw*0.75); prang(c.x + c.rx*0.5, base, pw*0.75); prang(c.x, base, pw*0.38);
   // กำแพงเมือง + ใบเสมา
   const wy = base + 6, wh = c.ry*0.28, wx0 = c.x - c.rx*0.95, ww = c.rx*1.9;
   rr(wx0, wy - wh, ww, wh, 6, '#efe2c4', '#9a7a4a');
@@ -482,8 +486,8 @@ function drawItem(it, t){
 }
 const BONES=[[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
 function drawHands(){
-  const hr = Math.min(W,H)*0.05;
   for (const h of hands){
+    const hr = h.hr || Math.min(W,H)*0.031;
     // รอยฟาด
     ctx.lineCap = 'round';
     for (let i=1;i<h.trail.length;i++){ const a = h.trail[i-1], b = h.trail[i]; if (b.s < W*0.25) continue;
@@ -496,6 +500,7 @@ function drawHands(){
     }
     const fast = h.speed > W*0.25;
     ctx.beginPath(); ctx.arc(h.x, h.y, hr, 0, Math.PI*2);
+    ctx.fillStyle = fast ? 'rgba(255,210,63,.18)' : 'rgba(255,255,255,.1)'; ctx.fill();
     ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = 10; ctx.stroke();
     ctx.strokeStyle = fast ? '#ffd23f' : h.col; ctx.lineWidth = 6; ctx.stroke();
   }
@@ -582,13 +587,16 @@ function updateWave(dt){
   const Wv = WAVES[wave];
   if (Wv.boss){
     if (!boss && !Wv.spawnedBoss){ Wv.spawnedBoss = true; boss = spawnGerm('boss', 'right'); boss.boat = false; boss.y = H*0.5; sfx.roar(); banner = {text:'จอมโรคห่ามาแล้ว!', sub:'ฟาดแรง ๆ หลายที!', t:2.2}; }
-    if (bossKilled){ germs.forEach(g => { if (!g.dead){ g.dead = true; burst(g.x, g.y, germColors(g.type), 10); } }); germs = []; win(); }
+    if (!bossKilled && boss){ bossSpawnT -= dt; if (bossSpawnT <= 0){ bossSpawnT = rage ? 0.8 : 1.5; spawnGerm(Math.random() < 0.5 ? 'cold' : (Math.random() < 0.5 ? 'bact' : 'virus')); } }
+    if (bossKilled){ rage = false; germs.forEach(g => { if (!g.dead){ g.dead = true; burst(g.x, g.y, germColors(g.type), 10); } }); germs = []; win(); }
     return;
   }
   if (spawned < Wv.n){
     nextSpawn -= dt;
     if (nextSpawn <= 0){
       spawnGerm(pickType(Wv.mix)); spawned++;
+      if (Wv.rush && spawned > Wv.n*0.4 && spawned < Wv.n){ spawnGerm(pickType(Wv.mix)); spawned++; }
+      if (Wv.rush && spawned === Math.ceil(Wv.n*0.4)){ banner = {text:'ทัพหนุนมาแล้ว!', sub:'เชื้อโรคบุกทีละ 2 ตัว!', t:1.8}; sfx.roar(); }
       const k = spawned / Wv.n; nextSpawn = Wv.gap[0] + (Wv.gap[1] - Wv.gap[0])*k;
     }
   } else if (!germs.length){ wave++; if (wave < WAVES.length) beginWave(); }
@@ -631,12 +639,13 @@ function loop(t){
         itemTimer -= dt; if (itemTimer <= 0){ spawnItem(); itemTimer = 10 + Math.random()*6; }
         shieldT = Math.max(0, shieldT - dt); slowT = Math.max(0, slowT - dt);
         comboT -= dt; if (comboT <= 0) combo = 0;
-        drumT -= dt; if (drumT <= 0){ sfx.drum(); drumT = WAVES[wave] && WAVES[wave].boss ? 0.4 : 0.7; }
+        drumT -= dt; if (drumT <= 0){ sfx.drum(); drumT = rage ? 0.22 : WAVES[wave] && WAVES[wave].boss ? 0.38 : WAVES[wave] && WAVES[wave].rush ? 0.45 : 0.7; }
         if (cityHP <= 0) lose();
       }
     }
     for (let i=0;i<cough.length;i++) cough[i] = Math.max(0, cough[i] - dt);
     drawCity(t);
+    if (rage && state === 'play'){ const a = 0.38 + 0.18*Math.sin(t/120); const g = ctx.createRadialGradient(W/2, H/2, Math.min(W,H)*0.3, W/2, H/2, Math.max(W,H)*0.65); g.addColorStop(0,'rgba(200,0,0,0)'); g.addColorStop(1,`rgba(200,0,0,${a})`); ctx.fillStyle = g; ctx.fillRect(0,0,W,H); }
     germs.forEach(g => drawGerm(g, t));
     items.forEach(it => drawItem(it, t));
     if (state === 'play' || state === 'over') drawHUD();
@@ -650,7 +659,7 @@ function loop(t){
 }
 function pixelTitle(el, text, color){ el.textContent = text; el.style.color = color === '#7be39a' ? '#2f8a3a' : color === '#ff6b5e' ? '#b8301a' : ''; }
 window.__spawn = (t, at) => spawnGerm(t, at);
-window.__g = () => ({germs, items, wave, intro, state, cityHP, score, kills, boss, WAVES});
+window.__g = () => ({rage, germs, items, wave, intro, state, cityHP, score, kills, boss, WAVES});
 resize(); initHands(); requestAnimationFrame(loop);
 </script>
 </body>
