@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>มอนสเตอร์หิวขยะ</title>
+<title>ศึกพิทักษ์กรุงศรี</title>
 <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@600;800&family=Pixelify+Sans:wght@700&family=Press+Start+2P&display=swap" rel="stylesheet">
 <style>
   html,body{margin:0;height:100%;overflow:hidden;background:#05071a;font-family:"Pixelify Sans","Kanit",Tahoma,sans-serif;color:#fff}
@@ -40,16 +40,16 @@
 <canvas id="u"></canvas>
 
 <div id="start" class="card">
-  <h1>มอนสเตอร์หิวขยะ!</h1>
-  <p><b>โบกมือ</b> ไปแตะขยะเพื่อหยิบ แล้วป้อนให้มอนสเตอร์ให้ถูกตัว<br>ป้อนผิด มอนสเตอร์จะคายออกมา!</p>
+  <h1>ศึกพิทักษ์กรุงศรี!</h1>
+  <p>ทัพเชื้อโรคกำลังบุกกรุงศรีอยุธยา!<br><b>ปัดมือฟาด</b>เชื้อโรคก่อนมันเข้าถึงชาวเมือง คว้าไอเท็มช่วยรบด้วยนะ</p>
   <div class="row legend">
-    <span style="background:#3fbf5a">ขยะเปียก</span><span style="background:#ffcf33;color:#000">รีไซเคิล</span>
-    <span style="background:#3f8fff">ขยะทั่วไป</span><span style="background:#ff4f4f">ขยะอันตราย</span>
+    <span style="background:#7be39a;color:#000">สบู่ ล้างเชื้อทั้งจอ</span><span style="background:#8fd3ff;color:#000">หน้ากาก โล่กันเมือง</span>
+    <span style="background:#ffcf33;color:#000">วัคซีน เชื้อโรคช้าลง</span><span style="background:#ff8a3d;color:#000">ผลไม้ ฟื้นพลังเมือง</span>
   </div>
   <div class="row">
-    <button class="blue" onclick="startGame('solo')">เล่นคนเดียว</button>
-    <button class="pink" onclick="startGame('duo')">แข่ง 2 คน</button>
+    <button class="pink" onclick="startGame()">เริ่มศึก!</button>
   </div>
+  <p style="font-size:16px;color:#a9a2d6">เล่นคนเดียว (ใช้ได้ 2 มือ) หรือช่วยกัน 2 คนก็ได้</p>
   <div id="status">กำลังเปิดกล้อง...</div>
 </div>
 
@@ -62,63 +62,39 @@
 <script type="module">
 const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
 const ucanvas = document.getElementById('u'), U = ucanvas.getContext('2d');
+const video = document.getElementById('video'), statusEl = document.getElementById('status');
 const PX = 4, PXU = 2;
 const INK = '#000', PAPER = '#1a1340', THAI = 'Kanit,Tahoma,sans-serif';
-const P_COLORS = ['#ff5fa2', '#3fb6ff'], P_NAMES = ['ฝั่งซ้าย', 'ฝั่งขวา'];
-const GAME_TIME = 60;
+const HAND_COLORS = ['#8fe9ff', '#ff5fa2'];
 let W, H;
 
-const MONSTERS = {
-  green:  {name:'ขยะเปียก',   body:'#3fbf5a', dark:'#23803a', lid:'#1d6b30'},
-  yellow: {name:'รีไซเคิล',   body:'#ffcf33', dark:'#c99a10', lid:'#a87d00'},
-  blue:   {name:'ขยะทั่วไป', body:'#3f8fff', dark:'#2560c0', lid:'#1c4a96'},
-  red:    {name:'ขยะอันตราย', body:'#ff4f4f', dark:'#c02e2e', lid:'#962020'},
+// ---------- ข้อมูล ----------
+const TYPES = {
+  cold:   {hp:1, speed:0.075, r:0.032, dmg:8,  pts:10, name:'เชื้อหวัด'},
+  bact:   {hp:1, speed:0.065, r:0.034, dmg:8,  pts:15, name:'แบคทีเรีย', split:true},
+  virus:  {hp:3, speed:0.06,  r:0.038, dmg:12, pts:30, name:'ไวรัสเกราะเหล็ก'},
+  minion: {hp:1, speed:0.09,  r:0.026, dmg:5,  pts:5,  name:'ลูกสมุน'},
+  boss:   {hp:28,speed:0.022, r:0.09,  dmg:40, pts:500,name:'จอมโรคห่า'},
 };
-const ITEMS = [
-  {e:'🍌',n:'เปลือกกล้วย',b:'green',f:'เศษอาหารหมักเป็นปุ๋ยให้ต้นไม้ได้'},
-  {e:'🍎',n:'แกนแอปเปิล',b:'green',f:'ขยะเปียกย่อยสลายได้เองตามธรรมชาติ'},
-  {e:'🥚',n:'เปลือกไข่',b:'green',f:'เปลือกไข่บดเป็นปุ๋ยให้ต้นไม้ได้'},
-  {e:'🍂',n:'ใบไม้แห้ง',b:'green',f:'ใบไม้แห้งทำปุ๋ยหมักได้ดีมาก'},
-  {e:'🐟',n:'ก้างปลา',b:'green',f:'เศษอาหารควรแยกออก ไม่ให้ปนกับขยะอื่น'},
-  {e:'🍉',n:'เปลือกแตงโม',b:'green',f:'เปลือกผลไม้เป็นอาหารของไส้เดือนได้'},
-  {e:'🧴',n:'ขวดพลาสติก',b:'yellow',f:'ขวดพลาสติกรีไซเคิลเป็นเสื้อได้นะ'},
-  {e:'🥫',n:'กระป๋อง',b:'yellow',f:'กระป๋องอะลูมิเนียมรีไซเคิลได้แทบไม่จำกัดครั้ง'},
-  {e:'📰',n:'หนังสือพิมพ์',b:'yellow',f:'รีไซเคิลกระดาษช่วยลดการตัดต้นไม้'},
-  {e:'📦',n:'กล่องกระดาษ',b:'yellow',f:'กล่องกระดาษนำกลับมาทำกล่องใหม่ได้'},
-  {e:'🍾',n:'ขวดแก้ว',b:'yellow',f:'แก้วหลอมแล้วทำขวดใหม่ได้เรื่อย ๆ'},
-  {e:'🍬',n:'ซองขนม',b:'blue',f:'ซองขนมมีหลายชั้นซ้อนกัน เลยรีไซเคิลยาก'},
-  {e:'🧻',n:'ทิชชู่ใช้แล้ว',b:'blue',f:'ทิชชู่ใช้แล้วสกปรก รีไซเคิลไม่ได้'},
-  {e:'🍱',n:'กล่องโฟม',b:'blue',f:'โฟมใช้เวลาย่อยสลายนานหลายร้อยปี'},
-  {e:'🩹',n:'พลาสเตอร์ยา',b:'blue',f:'ของใช้แล้วที่ปนเปื้อน ทิ้งถังทั่วไป'},
-  {e:'🔋',n:'ถ่านไฟฉาย',b:'red',f:'ถ่านมีสารเคมีอันตรายต่อดินและน้ำ'},
-  {e:'💡',n:'หลอดไฟ',b:'red',f:'หลอดไฟบางชนิดมีสารปรอทอยู่ข้างใน'},
-  {e:'💊',n:'ยาหมดอายุ',b:'red',f:'ยาหมดอายุห้ามทิ้งรวมกับขยะทั่วไป'},
-  {e:'📱',n:'มือถือเก่า',b:'red',f:'ขยะอิเล็กทรอนิกส์มีโลหะหนัก ต้องแยกทิ้ง'},
-  {e:'🌡️',n:'ปรอทวัดไข้',b:'red',f:'ปรอทเป็นพิษ ถ้าแตกห้ามจับด้วยมือ'},
-  // เพิ่ม
-  {e:'🍚',n:'ข้าวเหลือ',b:'green',f:'กินข้าวให้หมดจาน ช่วยลดขยะเปียกได้'},
-  {e:'🥕',n:'เศษผัก',b:'green',f:'เศษผักทำปุ๋ยหมักหรือน้ำหมักชีวภาพได้'},
-  {e:'☕',n:'กากกาแฟ',b:'green',f:'กากกาแฟโรยดินช่วยบำรุงต้นไม้ได้'},
-  {e:'🥥',n:'กะลามะพร้าว',b:'green',f:'กะลามะพร้าวย่อยสลายได้ตามธรรมชาติ'},
-  {e:'🍗',n:'กระดูกไก่',b:'green',f:'เศษอาหารทุกชนิดเป็นขยะเปียก'},
-  {e:'🥛',n:'กล่องนม',b:'yellow',f:'กล่องนมรีไซเคิลทำเป็นแผ่นหลังคาได้'},
-  {e:'📄',n:'กระดาษ A4',b:'yellow',f:'กระดาษใช้สองหน้าก่อนทิ้ง ช่วยประหยัดต้นไม้'},
-  {e:'🥤',n:'แก้วพลาสติก',b:'yellow',f:'ล้างแก้วก่อนทิ้ง จะรีไซเคิลได้ง่ายขึ้น'},
-  {e:'🔩',n:'เศษเหล็ก',b:'yellow',f:'เหล็กหลอมแล้วนำมาใช้ใหม่ได้'},
-  {e:'🍥',n:'ซองบะหมี่',b:'blue',f:'ซองบะหมี่เปื้อนน้ำมัน รีไซเคิลยาก'},
-  {e:'🥢',n:'ตะเกียบใช้แล้ว',b:'blue',f:'ของใช้แล้วที่เปื้อนอาหาร ทิ้งถังทั่วไป'},
-  {e:'😷',n:'หน้ากากอนามัย',b:'blue',f:'หน้ากากใช้แล้ว พับใส่ถุงก่อนทิ้งนะ'},
-  {e:'🧸',n:'ตุ๊กตาขาด',b:'blue',f:'ของเล่นที่ยังดีอยู่ บริจาคต่อได้นะ'},
-  {e:'🥡',n:'กล่องข้าวเปื้อน',b:'blue',f:'กล่องที่เปื้อนอาหารมาก รีไซเคิลไม่ได้'},
-  {e:'🧯',n:'กระป๋องสเปรย์',b:'red',f:'กระป๋องสเปรย์มีแรงดัน ห้ามเผาเด็ดขาด'},
-  {e:'🎨',n:'กระป๋องสี',b:'red',f:'สีมีสารเคมี ต้องแยกทิ้งเป็นขยะอันตราย'},
-  {e:'🧪',n:'น้ำยาเคมี',b:'red',f:'น้ำยาเคมีห้ามเทลงท่อ เป็นอันตรายต่อสัตว์น้ำ'},
-  {e:'🔌',n:'สายชาร์จเสีย',b:'red',f:'เครื่องใช้ไฟฟ้าเสียเป็นขยะอันตราย'},
+const WAVES = [
+  {title:'ศึกที่ 1: ทัพเชื้อหวัด', fact:'เชื้อหวัดติดต่อทางละอองไอจาม ปิดปากเวลาไอนะ', mix:{cold:1}, n:14, gap:[2.0,1.1]},
+  {title:'ศึกที่ 2: กองทัพแบคทีเรีย', fact:'แบคทีเรียแบ่งตัวได้เร็วมาก ถ้าปล่อยไว้จะเพิ่มเป็นสองเท่า!', mix:{cold:0.5, bact:0.5}, n:18, gap:[1.6,0.9]},
+  {title:'ศึกที่ 3: ไวรัสเกราะเหล็ก', fact:'ไวรัสตัวเล็กมาก ต้องใช้กล้องจุลทรรศน์อิเล็กตรอนถึงจะเห็น', mix:{cold:0.35, bact:0.35, virus:0.3}, n:20, gap:[1.5,0.8]},
+  {title:'ศึกสุดท้าย: จอมโรคห่า!', fact:'ตามตำนาน พระเจ้าอู่ทองย้ายมาสร้างกรุงศรีอยุธยาเพราะหนีโรคระบาด', boss:true},
 ];
+const ITEMS = {
+  soap:    {name:'สบู่',      col:'#7be39a', fact:'ล้างมือด้วยสบู่ 20 วินาที ช่วยกำจัดเชื้อโรคได้!'},
+  mask:    {name:'หน้ากาก',  col:'#8fd3ff', fact:'หน้ากากช่วยกันละอองไอจามที่มีเชื้อโรค'},
+  vaccine: {name:'วัคซีน',   col:'#ffcf33', fact:'วัคซีนช่วยให้ร่างกายรู้จักเชื้อโรคไว้ก่อน'},
+  fruit:   {name:'ผลไม้',    col:'#ff8a3d', fact:'กินผักผลไม้ ช่วยให้ภูมิคุ้มกันแข็งแรง'},
+};
+const RANKS = [[20,'เจ้าพระยามหาภูมิคุ้มกัน'],[10,'พระยาปราบโรค'],[5,'ขุนพลภูมิคุ้มกัน']];
 
-let mode = 'solo', level = 1, state = 'menu', players = [], countdown = 0, lastT = 0, playT = 0, lastBeep = 4;
-let particles = [], stars = [], banner = null, keys = [];
-for (let i=0;i<90;i++) stars.push({x:Math.random(), y:Math.random(), s:Math.random()*2+0.5, p:Math.random()*6});
+let state = 'menu', lastT = 0, countdown = 0, lastBeep = 4;
+let wave = 0, waveT = 0, spawned = 0, nextSpawn = 0, intro = 0;
+let germs = [], items = [], particles = [], floaters = [], hands = [];
+let cityHP = 100, score = 0, kills = 0, combo = 0, comboT = 0, bestCombo = 0, rankShown = '';
+let bossKilled = false, shieldT = 0, slowT = 0, itemTimer = 8, fact = null, drumT = 0, shake = 0, cough = [0,0,0,0,0], boss = null;
 
 function resize(){
   W = innerWidth; H = innerHeight;
@@ -126,11 +102,12 @@ function resize(){
   ucanvas.width = Math.ceil(W/PXU); ucanvas.height = Math.ceil(H/PXU);
   ctx.setTransform(1/PX,0,0,1/PX,0,0); U.setTransform(1/PXU,0,0,1/PXU,0,0);
   ctx.imageSmoothingEnabled = false; U.imageSmoothingEnabled = false;
-  players.forEach(layoutPlayer);
 }
 addEventListener('resize', resize);
+const city = () => ({x: W/2, y: H*0.8, rx: Math.min(W*0.24, H*0.5), ry: H*0.13});
+const unit = () => Math.min(W, H*1.6);
 
-// ---------- sound ----------
+// ---------- เสียง ----------
 let actx = null;
 function audio(){ if (!actx) try { actx = new (window.AudioContext||window.webkitAudioContext)(); } catch {} return actx; }
 function tone(f, d=0.15, type='square', vol=0.1, delay=0, f2=null){
@@ -140,36 +117,41 @@ function tone(f, d=0.15, type='square', vol=0.1, delay=0, f2=null){
   g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + d);
   o.connect(g).connect(a.destination); o.start(t); o.stop(t + d + 0.05);
 }
+function noise(d=0.15, vol=0.12){
+  const a = audio(); if (!a) return;
+  const b = a.createBuffer(1, a.sampleRate*d, a.sampleRate), ch = b.getChannelData(0);
+  for (let i=0;i<ch.length;i++) ch[i] = (Math.random()*2-1) * (1 - i/ch.length);
+  const s = a.createBufferSource(), g = a.createGain(); g.gain.value = vol; s.buffer = b; s.connect(g).connect(a.destination); s.start();
+}
 const sfx = {
-  grab:  ()=> tone(440, 0.07, 'triangle', 0.12),
-  chomp: ()=>{ for (let i=0;i<3;i++) tone(180-i*20, 0.07, 'square', 0.12, i*0.11); tone(880,0.12,'square',0.08,0.36); tone(1320,0.18,'square',0.08,0.45); },
-  yuck:  ()=> tone(400, 0.45, 'sawtooth', 0.09, 0, 90),
-  combo: n => [660,880,1100,1320].slice(0, Math.min(4, n)).forEach((f,i)=>tone(f,0.1,'square',0.08,0.5+i*0.07)),
+  hit:   ()=>{ noise(0.08, 0.15); tone(500, 0.06, 'square', 0.07); },
+  armor: ()=> tone(1400, 0.08, 'triangle', 0.1),
+  pop:   n => { tone(700 + Math.min(n,10)*60, 0.09, 'square', 0.08); tone(1100 + Math.min(n,10)*60, 0.1, 'square', 0.06, 0.06); },
+  hurt:  ()=>{ tone(160, 0.25, 'sawtooth', 0.12, 0, 80); },
+  gong:  ()=>{ tone(110, 1.6, 'sine', 0.25); tone(165, 1.2, 'sine', 0.1); tone(220, 0.8, 'triangle', 0.06); },
+  drum:  ()=> tone(70, 0.12, 'sine', 0.22, 0, 45),
+  item:  ()=> [660,880,1100,1320].forEach((f,i)=>tone(f,0.1,'square',0.08,i*0.06)),
+  soap:  ()=>{ noise(0.6, 0.15); [523,784,1046].forEach((f,i)=>tone(f,0.2,'triangle',0.1,i*0.1)); },
+  roar:  ()=>{ tone(90, 0.9, 'sawtooth', 0.15, 0, 50); noise(0.5, 0.1); },
+  rank:  ()=> [523,659,784,1046].forEach((f,i)=>tone(f,0.16,'square',0.09,i*0.09)),
   beep:  ()=> tone(520, 0.15, 'square', 0.1),
   go:    ()=> tone(880, 0.35, 'square', 0.12),
-  win:   ()=> [523,659,784,1046,1318].forEach((f,i)=>tone(f,0.25,'square',0.1,i*0.12)),
+  win:   ()=> [523,659,784,1046,1318,1568].forEach((f,i)=>tone(f,0.25,'square',0.1,i*0.12)),
+  lose:  ()=> [392,330,262,196].forEach((f,i)=>tone(f,0.35,'triangle',0.12,i*0.25)),
 };
 
-// ---------- menu ----------
-window.setLevel = lv => {
-  level = lv;
-  document.getElementById('lv1').classList.toggle('on', lv===1);
-  document.getElementById('lv2').classList.toggle('on', lv===2);
-};
+// ---------- เมนู ----------
 window.showStart = ()=>{
-  state = 'menu'; players = [];
+  state = 'menu';
   document.getElementById('end').classList.add('hidden');
   document.getElementById('start').classList.remove('hidden');
 };
-window.startGame = m => {
-  audio(); mode = m;
-  keys = ['green','yellow','blue','red'];
-  const pool = ITEMS.filter(i => keys.includes(i.b));
-  // สุ่มแบบวนครบทุกชิ้นก่อนซ้ำ และสลับประเภทให้ทั่วถึง
-  const order = []; while (order.length < 120) order.push(...[...pool].sort(()=>Math.random()-0.5));
-  players = mode==='solo' ? [makePlayer(0,0,1,order)] : [makePlayer(0,0,0.5,order), makePlayer(1,0.5,1,order)];
-  players.forEach(layoutPlayer);
-  particles = []; banner = null; state = 'countdown'; countdown = 3.999; lastBeep = 4;
+window.startGame = ()=>{
+  audio();
+  germs = []; items = []; particles = []; floaters = []; boss = null;
+  cityHP = 100; score = 0; kills = 0; combo = 0; bestCombo = 0; rankShown = '';
+  shieldT = 0; slowT = 0; itemTimer = 8; fact = null; wave = 0; WAVES.forEach(w => delete w.spawnedBoss); bossKilled = false;
+  state = 'countdown'; countdown = 3.999; lastBeep = 4;
   document.getElementById('start').classList.add('hidden');
   document.getElementById('end').classList.add('hidden');
 };
@@ -177,111 +159,89 @@ addEventListener('keydown', e=>{
   if (e.code === 'Space' && state === 'over') showStart();
   if (e.code === 'Escape') showStart();
 });
+function beginWave(){ intro = 3.2; waveT = 0; spawned = 0; nextSpawn = 0.5; sfx.gong(); }
 
-// ---------- players ----------
-function makePlayer(idx, f0, f1, order){
-  return {idx, f0, f1, order, k:0, current:null, held:false, score:0, wrong:0, combo:0, best:0,
-          hand:{x:-999,y:-999,seen:false}, pts:null, lost:0, msg:null, mons:[], R:40};
+// ---------- เชื้อโรค ----------
+function spawnGerm(type, at){
+  const T = TYPES[type], u = unit(), side = at || pickSide();
+  let x, y, boat = false, fly = false;
+  if (side === 'left'){ x = -60; y = H*(0.62 + Math.random()*0.08); boat = Math.random() < 0.6; }
+  else if (side === 'right'){ x = W + 60; y = H*(0.62 + Math.random()*0.08); boat = Math.random() < 0.6; }
+  else { x = W*(0.1 + Math.random()*0.8); y = -60; fly = true; }
+  const g = {type, x, y, hp:T.hp, max:T.hp, r:T.r*u, sp:T.speed*u, boat, fly, t:0, ph:Math.random()*6, hitCD:0, flash:0, kx:0, ky:0, split:false};
+  germs.push(g); return g;
 }
-function layoutPlayer(p){
-  p.x0 = p.f0*W; p.x1 = p.f1*W;
-  const w = p.x1-p.x0, n = keys.length, slot = w/n;
-  const mw = Math.min(slot*0.72, 240), mh = Math.min(H*0.3, mw*1.15);
-  p.R = Math.min(w*0.07, H*0.075);
-  const old = p.mons;
-  p.mons = keys.map((k,i)=>({k, ...MONSTERS[k], x: p.x0 + slot*(i+0.5) - mw/2, y: H - mh - 22, w: mw, h: mh,
-    open: 0, chomp: 0, happy: 0, yuck: 0, shake: 0, ph: Math.random()*6, ...(old[i] ? {open:old[i].open} : {})}));
-}
-function nextItem(p){
-  const it = p.order[p.k++ % p.order.length], w = p.x1-p.x0;
-  p.current = {...it, x: p.x0 + w*(0.25+Math.random()*0.5), y: -60, wob: 0, bounce: 0, spitVX: 0, spitVY: 0};
-}
-function updatePlayer(p, dt){
-  for (const m of p.mons){ m.chomp = Math.max(0,m.chomp-dt); m.happy = Math.max(0,m.happy-dt); m.yuck = Math.max(0,m.yuck-dt); m.shake = Math.max(0,m.shake-dt*2); }
-  const c = p.current; if (!c) return;
-  const h = p.hand;
-  if (c.bounce > 0){ // ถูกคายออกมา
-    c.bounce -= dt; c.x += c.spitVX*dt; c.y += c.spitVY*dt; c.spitVY += 900*dt;
-    c.x = Math.max(p.x0+p.R, Math.min(p.x1-p.R, c.x));
-    if (c.bounce <= 0) c.y = Math.min(c.y, H*0.35);
-  } else if (!h.seen){ p.lost += dt; if (p.held && p.lost > 0.6) p.held = false; }
-  else {
-    p.lost = 0;
-    if (!p.held && Math.hypot(c.x-h.x, c.y-h.y) < p.R*1.5){ p.held = true; sfx.grab(); }
-    if (p.held){
-      c.x += (h.x-c.x)*0.5; c.y += (h.y-c.y)*0.5;
-      c.x = Math.max(p.x0+p.R, Math.min(p.x1-p.R, c.x));
-      const m = p.mons.find(m => c.x > m.x-10 && c.x < m.x+m.w+10 && c.y > m.y+m.h*0.05);
-      if (m) feed(p, m);
+function pickSide(){ const r = Math.random(); return r < 0.35 ? 'left' : r < 0.7 ? 'right' : 'top'; }
+function pickType(mix){ let r = Math.random(); for (const k in mix){ r -= mix[k]; if (r <= 0) return k; } return Object.keys(mix)[0]; }
+function updateGerms(dt){
+  const c = city(), target = {x: c.x, y: c.y - c.ry*0.6}, slow = slowT > 0 ? 0.4 : 1;
+  for (const g of germs){
+    g.t += dt; g.hitCD = Math.max(0, g.hitCD - dt); g.flash = Math.max(0, g.flash - dt);
+    const dx = target.x - g.x, dy = target.y - g.y, d = Math.hypot(dx, dy) || 1;
+    let sp = g.sp * slow;
+    g.x += (dx/d*sp + g.kx)*dt; g.y += (dy/d*sp + g.ky)*dt;
+    g.x += Math.sin(g.t*3 + g.ph)*12*dt*(g.fly?3:1);
+    g.kx *= Math.pow(0.02, dt); g.ky *= Math.pow(0.02, dt);
+    // แบคทีเรียแบ่งตัว
+    if (TYPES[g.type].split && !g.split && g.t > 5){ g.split = true; const n = spawnGerm('bact', 'top'); n.x = g.x + g.r*2; n.y = g.y; n.split = true; n.t = 0; float(g.x, g.y - g.r*2, 'แบ่งตัว!', '#b48cff'); }
+    // บอสเสกลูกสมุน
+    if (g.type === 'boss'){ g.summon = (g.summon || 2) - dt; if (g.summon <= 0){ g.summon = 3.2; for (let k=0;k<2;k++){ const m = spawnGerm('minion', 'top'); m.x = g.x + (k?1:-1)*g.r; m.y = g.y - g.r*0.5; } sfx.roar(); } }
+    // ถึงเมือง
+    if (d < c.rx*0.35 + g.r){
+      if (g.type === 'boss'){ // บอสโดนกำแพงแล้วถอยกลับไปตั้งหลัก
+        if (shieldT <= 0){ cityHP = Math.max(0, cityHP - 20); sfx.hurt(); shake = 0.6; combo = 0; cough[2] = 1.2; }
+        g.x = g.x < c.x ? -40 : W + 40; g.y = H*0.45; g.kx = g.ky = 0; sfx.roar();
+        float(c.x, c.y - c.ry*2, 'จอมโรคห่าถอยทัพ!', '#ff6b5e'); continue;
+      }
+      g.dead = true;
+      if (shieldT > 0){ burst(g.x, g.y, ['#8fd3ff','#fff'], 14); float(g.x, g.y, 'กันได้!', '#8fd3ff'); }
+      else {
+        cityHP = Math.max(0, cityHP - TYPES[g.type].dmg); sfx.hurt(); shake = 0.3; combo = 0;
+        cough[Math.floor(Math.random()*cough.length)] = 1.2;
+        burst(g.x, g.y, ['#ff6b5e','#fff'], 16);
+      }
     }
   }
-  if (!p.held && c.bounce <= 0){
-    c.wob += dt*2;
-    const stopY = H*0.33;
-    if (c.y < stopY) c.y = Math.min(stopY, c.y + H*0.3*dt); else c.y = stopY + Math.sin(c.wob)*12;
-  }
-  // ปากอ้าตามระยะขยะที่ถืออยู่
-  for (const m of p.mons){
-    const near = p.held ? Math.max(0, 1 - Math.hypot(c.x-(m.x+m.w/2), c.y-(m.y+m.h*0.45)) / (m.w*1.6)) : 0;
-    m.open += (near - m.open)*Math.min(1, dt*10);
-  }
+  germs = germs.filter(g => !g.dead);
 }
-function feed(p, m){
-  const c = p.current; p.held = false;
-  if (m.k === c.b){
-    p.score++; p.combo++; p.best = Math.max(p.best, p.combo);
-    m.chomp = 0.55; m.happy = 1.1; sfx.chomp();
-    if (p.combo >= 3) sfx.combo(p.combo - 1);
-    crumbs(m.x+m.w/2, m.y+m.h*0.4, [m.body,'#fff','#ffcf33']);
-    p.msg = {ok:true, title: p.combo >= 3 ? `อร่อย! คอมโบ x${p.combo}` : `อร่อย! ${c.n} → ${m.name}`, text: c.f, t: mode==='solo'?3:1.6};
-    nextItem(p);
-  } else {
-    p.wrong++; p.combo = 0; m.yuck = 1; m.shake = 1; sfx.yuck();
-    p.msg = {ok:false, title:`แหวะ! ${c.n} ไม่ใช่${m.name}`, text: true ? `ต้องป้อนให้ตัว "${MONSTERS[c.b].name}" นะ` : '', t:2.4};
-    c.bounce = 0.7; c.spitVX = (Math.random()-0.5)*500; c.spitVY = -900;
+function damageGerm(g, n, vx, vy){
+  if (g.hitCD > 0) return;
+  g.hitCD = 0.18; g.hp -= n; g.flash = 0.12;
+  const s = Math.hypot(vx, vy) || 1; g.kx = vx/s*unit()*0.5; g.ky = vy/s*unit()*0.5;
+  if (g.hp > 0){ g.type === 'virus' || g.type === 'boss' ? sfx.armor() : sfx.hit(); burst(g.x, g.y, ['#fff'], 6); return; }
+  g.dead = true; kills++; combo++; comboT = 1.6; bestCombo = Math.max(bestCombo, combo);
+  const pts = TYPES[g.type].pts * (1 + Math.floor(combo/5)); score += pts;
+  sfx.pop(combo); burst(g.x, g.y, germColors(g.type), g.type === 'boss' ? 80 : 18);
+  float(g.x, g.y - g.r, `+${pts}`, '#ffcf33');
+  if (g.type === 'boss'){ boss = null; bossKilled = true; shake = 0.8; banner = {text:'ปราบจอมโรคห่าได้แล้ว!', t:2.2}; }
+  for (const [n2, name] of RANKS){ if (combo === n2){ banner = {text: name, sub:`คอมโบ ${combo}!`, t: 2}; sfx.rank(); break; } }
+}
+function germColors(t){ return t==='cold' ? ['#7be39a','#3fbf5a'] : t==='bact' ? ['#b48cff','#7a4fd6'] : t==='virus' ? ['#ff6b5e','#c02e2e'] : t==='boss' ? ['#7a3fa0','#ffcf33','#ff6b5e'] : ['#9fe8a6','#5cc06a']; }
+
+// ---------- ไอเท็ม ----------
+function spawnItem(){
+  const keys = Object.keys(ITEMS), k = cityHP < 60 && Math.random() < 0.5 ? 'fruit' : keys[Math.floor(Math.random()*keys.length)];
+  items.push({k, x: W*(0.15 + Math.random()*0.7), y: -40, vy: H*0.12, t: 0});
+}
+function useItem(it){
+  it.dead = true; sfx.item(); fact = {text: ITEMS[it.k].fact, title: ITEMS[it.k].name, col: ITEMS[it.k].col, t: 3.5};
+  if (it.k === 'soap'){ sfx.soap(); shake = 0.4;
+    for (const g of germs){ if (g.type === 'boss'){ g.hp = Math.max(1, g.hp - 4); g.flash = 0.3; } else { g.dead = true; kills++; score += TYPES[g.type].pts; burst(g.x, g.y, ['#ffffff','#bdf0ff','#7be39a'], 14); } }
+    germs = germs.filter(g => !g.dead);
+    for (let i=0;i<40;i++) particles.push({x:Math.random()*W, y:H+20, vx:(Math.random()-0.5)*80, vy:-200-Math.random()*300, c:'#e8fbff', life:2, g:-20, bub:true});
   }
+  if (it.k === 'mask') shieldT = 7;
+  if (it.k === 'vaccine') slowT = 7;
+  if (it.k === 'fruit'){ cityHP = Math.min(100, cityHP + 25); float(W/2, city().y - city().ry, '+25 พลังเมือง', '#7be39a'); }
 }
-function crumbs(x, y, colors){
-  for (let i=0;i<26;i++){ const a=Math.random()*Math.PI*2, v=150+Math.random()*320;
-    particles.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v-200,c:colors[i%colors.length],life:1}); }
-}
-function confetti(x0, x1){
-  const cols = ['#ff5fa2','#3fb6ff','#ffcf33','#7be39a','#ffffff','#b48cff'];
-  for (let i=0;i<220;i++) particles.push({x:x0+Math.random()*(x1-x0), y:-20-Math.random()*H*0.5, vx:(Math.random()-0.5)*120, vy:100+Math.random()*200, c:cols[i%cols.length], life:3.5, slow:true});
+function updateItems(dt){
+  for (const it of items){ it.t += dt; it.y += it.vy*dt; it.x += Math.sin(it.t*2)*30*dt; if (it.y > H*0.7) it.dead = true; }
+  items = items.filter(i => !i.dead);
 }
 
-// ---------- end ----------
-function endGame(){
-  state = 'over'; sfx.win();
-  if (mode === 'solo'){
-    const p = players[0]; confetti(0, W);
-    const title = p.score >= 15 ? 'ฮีโร่รักษ์โลกระดับตำนาน!' : p.score >= 10 ? 'ฮีโร่รักษ์โลกระดับทอง!' : p.score >= 5 ? 'ฮีโร่รักษ์โลกระดับเงิน!' : 'ฮีโร่รักษ์โลกฝึกหัด!';
-    setTimeout(()=>{
-      pixelTitle(document.getElementById('endTitle'), title);
-      document.getElementById('endText').innerHTML = `ป้อนถูก <b>${p.score}</b> ชิ้น · ป้อนผิด ${p.wrong} ชิ้น · คอมโบสูงสุด x${p.best}<br><br><span style="font-size:.85em">กลับบ้านไปช่วยที่บ้านแยกขยะด้วยนะ มอนสเตอร์ฝากมา</span>`;
-      document.getElementById('end').classList.remove('hidden');
-    }, 1300);
-    return;
-  }
-  const [a, b] = players;
-  const w = a.score > b.score ? a : b.score > a.score ? b : (a.wrong < b.wrong ? a : b.wrong < a.wrong ? b : null);
-  if (w){ confetti(w.x0, w.x1); banner = {p: w}; } else confetti(0, W);
-  setTimeout(()=>{
-    pixelTitle(document.getElementById('endTitle'), w ? `${P_NAMES[w.idx]}ชนะ!` : 'เสมอกัน! เก่งทั้งคู่', w ? P_COLORS[w.idx] : '#ffcf33');
-    const line = p => `<b style="color:${P_COLORS[p.idx]}">${P_NAMES[p.idx]}</b> ป้อนถูก ${p.score} ชิ้น · ผิด ${p.wrong} · คอมโบสูงสุด x${p.best}`;
-    document.getElementById('endText').innerHTML = `${line(a)}<br>${line(b)}`;
-    document.getElementById('end').classList.remove('hidden');
-  }, 2200);
-}
-
-// ---------- hand tracking ----------
-let handOK = false, landmarker = null, lastVideoTime = -1;
-addEventListener('mousemove', e=>{
-  if (handOK || !players.length) return;
-  const p = players.find(p => e.clientX >= p.x0 && e.clientX < p.x1) || players[0];
-  players.forEach(q => { if (q !== p) q.hand.seen = false; });
-  p.hand.x = e.clientX; p.hand.y = e.clientY; p.hand.seen = true;
-});
+// ---------- มือ ----------
+let handOK = false, landmarker = null, lastVideoTime = -1, mouseHand = null;
+addEventListener('mousemove', e=>{ if (!handOK) mouseHand = {x:e.clientX, y:e.clientY}; });
 async function initHands(){
   try{
     video.srcObject = await navigator.mediaDevices.getUserMedia({video:{width:1280,height:720,facingMode:'user'}});
@@ -293,33 +253,58 @@ async function initHands(){
     try { landmarker = await HandLandmarker.createFromOptions(fs, opts('GPU')); }
     catch { landmarker = await HandLandmarker.createFromOptions(fs, opts('CPU')); }
     handOK = true;
-    statusEl.textContent = 'พร้อมเล่น! ยืนห่างกล้องประมาณ 1–1.5 เมตร แล้วยกมือขึ้น';
+    statusEl.textContent = 'พร้อมรบ! ยืนห่างกล้องประมาณ 1–1.5 เมตร แล้วยกมือขึ้น';
   }catch(err){
     console.error(err);
     statusEl.textContent = 'เปิดกล้องหรือตัวจับมือไม่ได้ ตอนนี้เล่นด้วยเมาส์ได้ · ตรวจว่าอนุญาตกล้องและต่ออินเทอร์เน็ต';
   }
 }
-const video = document.getElementById('video'), statusEl = document.getElementById('status');
 const mapPt = p => ({x:(1-(0.5+(p.x-0.5)*1.4))*W, y:(0.5+(p.y-0.5)*1.4)*H});
-function trackHands(){
-  if (!handOK || video.readyState < 2 || video.currentTime === lastVideoTime) return;
-  lastVideoTime = video.currentTime;
-  const r = landmarker.detectForVideo(video, performance.now());
-  const found = (r.landmarks || []).map(L => ({pts: L.map(mapPt), c: mapPt({x:(L[0].x+L[9].x)/2, y:(L[0].y+L[9].y)/2})}));
-  const assigned = players.map(()=>null);
-  if (mode === 'solo'){ if (found[0]) assigned[0] = found[0]; }
-  else for (const f of found){ const side = f.c.x < W/2 ? 0 : 1; if (!assigned[side]) assigned[side] = f; }
-  players.forEach((p,i)=>{
-    const f = assigned[i];
-    if (!f){ p.hand.seen = false; p.pts = null; return; }
-    p.pts = f.pts;
-    p.hand.x = p.hand.seen ? p.hand.x + (f.c.x-p.hand.x)*0.55 : f.c.x;
-    p.hand.y = p.hand.seen ? p.hand.y + (f.c.y-p.hand.y)*0.55 : f.c.y;
-    p.hand.seen = true;
-  });
+function trackHands(now){
+  let found = [];
+  if (handOK){
+    if (video.readyState >= 2 && video.currentTime !== lastVideoTime){
+      lastVideoTime = video.currentTime;
+      const r = landmarker.detectForVideo(video, performance.now());
+      found = (r.landmarks || []).map(L => ({pts: L.map(mapPt), c: mapPt({x:(L[0].x+L[9].x)/2, y:(L[0].y+L[9].y)/2})}));
+      // จับคู่กับมือเดิมตามตำแหน่งใกล้สุด
+      const next = found.map(f => {
+        let best = null, bd = 1e9; for (const h of hands){ const d = Math.hypot(h.x - f.c.x, h.y - f.c.y); if (d < bd && !h.used){ bd = d; best = h; } }
+        if (best && bd < W*0.3){ best.used = true; best.x += (f.c.x - best.x)*0.75; best.y += (f.c.y - best.y)*0.75; best.pts = f.pts; return best; }
+        return {x:f.c.x, y:f.c.y, pts:f.pts, hist:[], trail:[], col: HAND_COLORS[hands.length % 2]};
+      });
+      hands.forEach(h => h.used = false); next.forEach(h => h.used = false);
+      next.forEach((h,i) => h.col = HAND_COLORS[i % 2]);
+      hands = next;
+    }
+  } else if (mouseHand){
+    if (!hands[0]) hands = [{x:mouseHand.x, y:mouseHand.y, hist:[], trail:[], col:HAND_COLORS[0]}];
+    hands[0].x = mouseHand.x; hands[0].y = mouseHand.y;
+  }
+  for (const h of hands){
+    h.hist.push({t: now, x: h.x, y: h.y}); while (h.hist.length && now - h.hist[0].t > 100) h.hist.shift();
+    const a = h.hist[0], b = h.hist[h.hist.length-1], dt = (b.t - a.t)/1000;
+    h.vx = dt > 0.02 ? (b.x - a.x)/dt : 0; h.vy = dt > 0.02 ? (b.y - a.y)/dt : 0;
+    h.speed = Math.hypot(h.vx, h.vy);
+    h.trail.push({x:h.x, y:h.y, s:h.speed}); if (h.trail.length > 8) h.trail.shift();
+  }
+}
+function handleSwats(){
+  const hr = Math.min(W,H)*0.07;
+  for (const h of hands){
+    const fast = h.speed > W*0.25;
+    for (const g of germs){
+      if (Math.hypot(g.x - h.x, g.y - h.y) < hr + g.r){
+        if (fast) damageGerm(g, 1, h.vx, h.vy);
+        else if (g.type !== 'boss' && g.type !== 'virus' && h.speed > W*0.1) damageGerm(g, 1, h.vx || 1, h.vy);
+      }
+    }
+    germs = germs.filter(g => !g.dead);
+    for (const it of items) if (Math.hypot(it.x - h.x, it.y - h.y) < hr + 40) useItem(it);
+  }
 }
 
-// ---------- drawing helpers ----------
+// ---------- ตัวช่วยวาด ----------
 function sticker(x,y,w,h,fill,sh=6){
   const ctx = U;
   ctx.fillStyle='#000'; ctx.fillRect(x-4+sh,y-4+sh,w+8,h+8);
@@ -329,206 +314,271 @@ function sticker(x,y,w,h,fill,sh=6){
 }
 function label(t, x, y, size, fill='#fff'){
   const ctx = U;
-  ctx.font = `800 ${size}px ${/^[0-9A-Za-z!?\sx/.]+$/.test(t) ? '"Press Start 2P",' : ''}${THAI}`;
+  ctx.font = `800 ${size}px ${/^[0-9A-Za-z!?\sx/.+]+$/.test(t) ? '"Press Start 2P",' : ''}${THAI}`;
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'miter';
   ctx.lineWidth = Math.max(6, size*0.28); ctx.strokeStyle = INK; ctx.strokeText(t, x, y);
   ctx.fillStyle = fill; ctx.fillText(t, x, y);
 }
+function burst(x, y, cols, n){ for (let i=0;i<n;i++){ const a=Math.random()*Math.PI*2, v=150+Math.random()*350; particles.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v-150,c:cols[i%cols.length],life:1,g:700}); } }
+function float(x, y, text, col){ floaters.push({x, y, text, col, t:1.2}); }
+function box(x, y, w, h, col){ ctx.fillStyle = INK; ctx.fillRect(x-6, y-6, w+12, h+12); ctx.fillStyle = col; ctx.fillRect(x, y, w, h); }
+
 function drawBG(t){
   if (handOK && video.videoWidth){
     const vw=video.videoWidth, vh=video.videoHeight, s=Math.max(W/vw,H/vh);
     ctx.save(); ctx.translate(W,0); ctx.scale(-1,1);
     ctx.drawImage(video,(W-vw*s)/2,(H-vh*s)/2,vw*s,vh*s); ctx.restore();
   } else {
-    ctx.fillStyle='#4fc3f7'; ctx.fillRect(0,0,W,H);
-    ctx.fillStyle='#8fd96a'; ctx.fillRect(0,H*0.72,W,H*0.28);
-    ctx.fillStyle='#fff'; for (const s of stars.slice(0,8)){ const cx=((s.x*W + t*0.02*s.s) % (W+200))-100, cy=s.y*H*0.4; ctx.fillRect(cx,cy,80,24); ctx.fillRect(cx+16,cy-16,48,16); }
+    ctx.fillStyle='#ff9a5c'; ctx.fillRect(0,0,W,H*0.25); ctx.fillStyle='#ffc070'; ctx.fillRect(0,H*0.25,W,H*0.2); ctx.fillStyle='#ffe0a0'; ctx.fillRect(0,H*0.45,W,H*0.2);
+    ctx.fillStyle='#fff3c0'; ctx.fillRect(W*0.78, H*0.12, 64, 64);
   }
 }
-
-// ---------- monster ----------
-function drawMonster(m, p, t){
-  const bob = Math.round(Math.sin(t/400 + m.ph)*1.5)*4;
-  const sx = m.shake > 0 ? Math.round(Math.sin(t/30)*3)*4*m.shake : 0;
-  const x = m.x + sx, y = m.y + bob, w = m.w, h = m.h;
-  const chompOpen = m.chomp > 0 ? Math.abs(Math.sin(m.chomp*17)) : 0;
-  const open = Math.max(m.open, chompOpen, m.yuck > 0.5 ? 0.8 : 0);
-  // ตัว (ถัง) ขอบดำ
-  ctx.fillStyle = INK; ctx.fillRect(x-8, y+h*0.14-8, w+16, h*0.86+16);
-  ctx.fillStyle = m.body; ctx.fillRect(x, y+h*0.14, w, h*0.86);
-  ctx.fillStyle = m.dark; ctx.fillRect(x, y+h*0.86, w, h*0.14);
-  ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.fillRect(x+12, y+h*0.2, 12, h*0.5);
-  // ฝา = ผม ยกขึ้นตอนอ้าปาก
-  const lidY = y - open*h*0.12;
-  ctx.fillStyle = INK; ctx.fillRect(x-20, lidY-8, w+40, h*0.14+16);
-  ctx.fillStyle = m.lid; ctx.fillRect(x-12, lidY, w+24, h*0.14);
-  ctx.fillStyle = INK; ctx.fillRect(x+w/2-20, lidY-h*0.08, 40, h*0.08);
-  // ตา มองตามขยะ
-  const c = p.current, tx = c ? c.x : x+w/2, ty = c ? c.y : y;
-  const ex = w*0.2, ey = y + h*0.32, es = w*0.2;
-  for (const side of [-1, 1]){
-    const cx = x + w/2 + side*ex;
-    if (m.happy > 0){ // ตายิ้ม ^ ^
-      ctx.fillStyle = INK;
-      ctx.fillRect(cx-es/2, ey, es*0.3, 8); ctx.fillRect(cx-es*0.2, ey-10, es*0.4, 8); ctx.fillRect(cx+es*0.2, ey, es*0.3, 8);
-    } else if (m.yuck > 0){ // ตา X
-      ctx.fillStyle = INK;
-      for (let k=-2;k<=2;k++){ ctx.fillRect(cx+k*es*0.12-4, ey+k*es*0.12-4, 8, 8); ctx.fillRect(cx+k*es*0.12-4, ey-k*es*0.12-4, 8, 8); }
-    } else {
-      ctx.fillStyle = INK; ctx.fillRect(cx-es/2-6, ey-es/2-6, es+12, es+12);
-      ctx.fillStyle = '#fff'; ctx.fillRect(cx-es/2, ey-es/2, es, es);
-      const a = Math.atan2(ty-ey, tx-cx), d = es*0.22;
-      ctx.fillStyle = INK; ctx.fillRect(cx + Math.cos(a)*d - es*0.2, ey + Math.sin(a)*d - es*0.2, es*0.4, es*0.4);
-    }
+function drawCity(t){
+  const c = city(), gy = c.y;
+  // แม่น้ำล้อมเกาะเมือง
+  ctx.fillStyle = INK; ctx.fillRect(0, gy - c.ry - 26, W, H);
+  ctx.fillStyle = '#2f8fd6'; ctx.fillRect(0, gy - c.ry - 20, W, H);
+  ctx.fillStyle = '#7fc8f8'; for (let i=0;i<14;i++){ const x = ((i*173 + t*0.04) % (W+100)) - 50, y = gy - c.ry + (i%4)*c.ry*0.5; ctx.fillRect(x, y, 40, 6); }
+  // เกาะ
+  ctx.fillStyle = INK; ctx.fillRect(c.x - c.rx - 8, gy - c.ry*0.7 - 8, c.rx*2 + 16, H);
+  ctx.fillStyle = '#7cc45a'; ctx.fillRect(c.x - c.rx, gy - c.ry*0.7, c.rx*2, H);
+  ctx.fillStyle = '#5a9e3e'; for (let x = c.x - c.rx + 10; x < c.x + c.rx; x += 40) ctx.fillRect(x, gy - c.ry*0.7 + 20 + (x%3)*10, 12, 8);
+  // ปรางค์ 3 องค์ (แบบวัดไชยวัฒนาราม)
+  const pw = c.rx*0.22, base = gy - c.ry*0.7;
+  const prang = (x, s) => {
+    const w = pw*s; let y = base;
+    const tiers = [[1,0.18],[0.85,0.16],[0.7,0.22],[0.55,0.2],[0.4,0.22],[0.22,0.2],[0.1,0.3]];
+    for (const [k, hh] of tiers){ const ww = w*k, h = w*hh*2.2; y -= h; box(x - ww/2, y, ww, h, '#c98b5a'); ctx.fillStyle = '#a86a3e'; ctx.fillRect(x - ww/2, y + h - 6, ww, 6); }
+    ctx.fillStyle = INK; ctx.fillRect(x - 3, y - w*0.35, 6, w*0.35);
+  };
+  prang(c.x - c.rx*0.45, 0.7); prang(c.x + c.rx*0.45, 0.7); prang(c.x, 1.05);
+  // กำแพงเมือง + ใบเสมา
+  const wy = base - 4, wh = c.ry*0.35;
+  box(c.x - c.rx*0.95, wy - wh + wh, c.rx*1.9, 1, '#000');
+  ctx.fillStyle = INK; ctx.fillRect(c.x - c.rx*0.95 - 6, wy - wh*0.2 - 6, c.rx*1.9 + 12, wh*0.6 + 12);
+  ctx.fillStyle = '#e8dcc0'; ctx.fillRect(c.x - c.rx*0.95, wy - wh*0.2, c.rx*1.9, wh*0.6);
+  ctx.fillStyle = '#c9b58e'; for (let x = c.x - c.rx*0.95; x < c.x + c.rx*0.95; x += 28) ctx.fillRect(x, wy, 20, 6);
+  for (let x = c.x - c.rx*0.95; x < c.x + c.rx*0.95 - 10; x += 36){ ctx.fillStyle = INK; ctx.fillRect(x-4, wy - wh*0.2 - 26, 26, 26); ctx.fillStyle = '#e8dcc0'; ctx.fillRect(x, wy - wh*0.2 - 22, 18, 22); }
+  // ชาวเมือง
+  const n = cough.length;
+  for (let i=0;i<n;i++){
+    const px = c.x - c.rx*0.7 + i*(c.rx*1.4/(n-1)), jump = cough[i] > 0 ? Math.abs(Math.sin(cough[i]*12))*14 : Math.round(Math.sin(t/300+i))*4;
+    const py = gy + c.ry*0.15 - jump, s = Math.max(4, c.rx*0.012);
+    box(px - 3*s, py - 10*s, 6*s, 6*s, '#f2c79a');
+    ctx.fillStyle = INK; ctx.fillRect(px - 2*s, py - 8*s, s, s); ctx.fillRect(px + s, py - 8*s, s, s);
+    box(px - 4*s, py - 4*s, 8*s, 7*s, ['#d6455d','#3f8fff','#ffcf33','#7a4fd6','#3fbf5a'][i%5]);
+    ctx.fillStyle = INK; ctx.fillRect(px - 3*s, py - 12*s, 6*s, 2*s);
   }
-  // ปาก
-  const mw = w*0.62, mh = h*0.06 + open*h*0.26, mx = x + (w-mw)/2, my = y + h*0.5;
-  ctx.fillStyle = INK; ctx.fillRect(mx, my, mw, mh);
-  if (mh > h*0.12){ ctx.fillStyle = '#ff6b8a'; ctx.fillRect(mx+mw*0.25, my+mh-h*0.06, mw*0.5, h*0.05); }
-  ctx.fillStyle = '#fff';
-  const teeth = 4, tw = mw/(teeth*2);
-  for (let i=0;i<teeth;i++) ctx.fillRect(mx + tw*(i*2+0.5), my, tw, Math.min(12, mh*0.4));
-  if (m.yuck > 0){ // ลิ้นแลบ
-    ctx.fillStyle = '#ff6b8a'; ctx.fillRect(mx+mw*0.35, my+mh-6, mw*0.3, h*0.1);
+  // โล่หน้ากาก
+  if (shieldT > 0){
+    ctx.strokeStyle = (Math.floor(t/120)%2 || shieldT > 2) ? 'rgba(143,211,255,.9)' : 'rgba(143,211,255,.3)'; ctx.lineWidth = 12;
+    ctx.beginPath(); ctx.ellipse(c.x, gy - c.ry*0.6, c.rx*0.95, c.ry*2.1, 0, Math.PI, Math.PI*2); ctx.stroke();
   }
 }
-function drawMonsterLabels(p){
-  const fs = Math.max(15, Math.min((p.x1-p.x0)/keys.length*0.11, 26));
-  for (const m of p.mons){
-    label(m.name, m.x+m.w/2, m.y+m.h*0.93, fs);
-    if (m.yuck > 0.2) bubble(m.x+m.w/2, m.y-m.h*0.22, 'แหวะ!', '#ff6b5e');
-    else if (m.happy > 0.2) bubble(m.x+m.w/2, m.y-m.h*0.22, 'งั่ม ๆ!', '#7be39a');
+function drawGerm(g, t){
+  const r = g.r, x = g.x, y = g.y + (g.fly ? Math.sin(g.t*8)*6 : 0), flash = g.flash > 0;
+  if (g.boat){ box(x - r*1.4, y + r*0.6, r*2.8, r*0.5, '#8a5a2b'); ctx.fillStyle = INK; ctx.fillRect(x - r*1.6, y + r*0.5, r*0.3, r*0.4); ctx.fillRect(x + r*1.3, y + r*0.5, r*0.3, r*0.4); }
+  if (g.fly){ ctx.fillStyle = 'rgba(255,255,255,.85)'; const f = Math.sin(g.t*20) > 0 ? r*0.5 : 0; ctx.fillRect(x - r*1.6, y - r*0.3 - f, r*0.7, r*0.5); ctx.fillRect(x + r*0.9, y - r*0.3 - f, r*0.7, r*0.5); }
+  if (g.type === 'boss'){ // ช้างศึก
+    const ey = y + r*0.4;
+    box(x - r*1.4, ey, r*2.8, r*1.3, flash ? '#fff' : '#8a8a96');
+    box(x - r*1.4, ey + r*1.3, r*0.5, r*0.6, '#8a8a96'); box(x + r*0.9, ey + r*1.3, r*0.5, r*0.6, '#8a8a96');
+    box(x + r*1.4, ey + r*0.1, r*0.7, r*0.6, '#8a8a96'); box(x + r*1.9, ey + r*0.6, r*0.25, r*0.9, '#8a8a96');
+    ctx.fillStyle = '#ffcf33'; ctx.fillRect(x - r*1.2, ey + r*0.15, r*2.2, r*0.2);
+  }
+  const col = flash ? '#ffffff' : g.type==='cold' ? '#7be39a' : g.type==='bact' ? '#b48cff' : g.type==='virus' ? '#ff6b5e' : g.type==='boss' ? '#7a3fa0' : '#9fe8a6';
+  if (g.type === 'bact'){ box(x - r*1.3, y - r*0.7, r*2.6, r*1.4, col); }
+  else {
+    if (g.type === 'virus' || g.type === 'boss'){ ctx.fillStyle = INK; for (let k=0;k<8;k++){ const a = k*Math.PI/4 + g.t; ctx.fillRect(x + Math.cos(a)*r*1.15 - r*0.18, y + Math.sin(a)*r*1.15 - r*0.18, r*0.36, r*0.36); } }
+    ctx.fillStyle = INK; ctx.beginPath(); ctx.arc(x, y, r + 6, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.fillRect(x - r*0.6, y - r*0.6, r*0.35, r*0.35);
+  }
+  if (g.type === 'virus' && g.hp > 1){ ctx.strokeStyle = '#c9c9d6'; ctx.lineWidth = 8; ctx.strokeRect(x - r*0.9, y - r*0.9, r*1.8, r*1.8); }
+  // หน้าโกรธ
+  const e = r*0.28;
+  ctx.fillStyle = '#fff'; ctx.fillRect(x - r*0.5, y - r*0.25, e, e); ctx.fillRect(x + r*0.5 - e, y - r*0.25, e, e);
+  ctx.fillStyle = INK; ctx.fillRect(x - r*0.45, y - r*0.15, e*0.55, e*0.55); ctx.fillRect(x + r*0.5 - e*0.75, y - r*0.15, e*0.55, e*0.55);
+  ctx.fillRect(x - r*0.6, y - r*0.42, e*1.2, e*0.3); ctx.fillRect(x + r*0.6 - e*1.2, y - r*0.42, e*1.2, e*0.3);
+  ctx.fillRect(x - r*0.3, y + r*0.3, r*0.6, r*0.14);
+  if (g.type === 'boss'){ // มงกุฎ + หลอดเลือด
+    ctx.fillStyle = '#ffcf33'; for (let k=-1;k<=1;k++) ctx.fillRect(x + k*r*0.4 - r*0.12, y - r*1.45, r*0.24, r*0.4); ctx.fillRect(x - r*0.55, y - r*1.12, r*1.1, r*0.2);
   }
 }
-function bubble(x, y, t, col){
-  const ctx = U, f = Math.max(18, Math.min(W,H)*0.035);
-  ctx.font = `800 ${f}px ${THAI}`;
-  const w = ctx.measureText(t).width + 28;
-  sticker(x-w/2, y-f*0.8, w, f*1.6, '#fff', 4);
-  ctx.fillStyle = col; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(t, x, y);
-}
-function drawItem(p){
-  const c = p.current; if (!c) return;
-  const r = p.R*(p.held?1.12:1), x = c.x, y = c.y;
-  if (!p.held && c.bounce <= 0){ ctx.strokeStyle='rgba(255,255,255,.7)'; ctx.lineWidth=8; ctx.setLineDash([12,10]);
-    ctx.strokeRect(x-r*1.25, y-r*1.25, r*2.5, r*2.5); ctx.setLineDash([]); }
-  ctx.fillStyle = INK; ctx.fillRect(x-r-8, y-r-8, r*2+16, r*2+16);
-  ctx.fillStyle = '#fff8e7'; ctx.fillRect(x-r, y-r, r*2, r*2);
-  ctx.font = `${r*1.45}px sans-serif`; ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillText(c.e, x, y + r*0.08);
-}
-function drawItemLabel(p){
-  const c = p.current; if (!c) return;
-  const r = p.R*(p.held?1.12:1);
-  label(c.n, c.x, c.y - r - Math.max(18, r*0.45), Math.max(18, r*0.45));
+function drawItem(it, t){
+  const r = Math.min(W,H)*0.045, x = it.x, y = it.y, I = ITEMS[it.k];
+  ctx.fillStyle = 'rgba(255,255,255,.6)'; ctx.beginPath(); ctx.arc(x, y, r*1.25 + Math.sin(t/150)*4, 0, Math.PI*2); ctx.fill();
+  box(x - r*0.8, y - r*0.8, r*1.6, r*1.6, I.col);
+  ctx.fillStyle = INK;
+  if (it.k === 'soap'){ ctx.fillStyle = '#fff'; ctx.fillRect(x - r*0.5, y - r*0.2, r, r*0.5); ctx.fillRect(x + r*0.2, y - r*0.6, r*0.25, r*0.25); ctx.fillRect(x - r*0.1, y - r*0.75, r*0.18, r*0.18); }
+  if (it.k === 'mask'){ ctx.fillStyle = '#fff'; ctx.fillRect(x - r*0.55, y - r*0.3, r*1.1, r*0.6); ctx.fillStyle = INK; ctx.fillRect(x - r*0.75, y - r*0.2, r*0.2, 6); ctx.fillRect(x + r*0.55, y - r*0.2, r*0.2, 6); ctx.fillRect(x - r*0.4, y - r*0.05, r*0.8, 5); }
+  if (it.k === 'vaccine'){ ctx.fillStyle = '#fff'; ctx.fillRect(x - r*0.6, y - r*0.15, r*0.9, r*0.3); ctx.fillStyle = INK; ctx.fillRect(x + r*0.3, y - 3, r*0.4, 6); ctx.fillRect(x - r*0.75, y - r*0.25, 8, r*0.5); }
+  if (it.k === 'fruit'){ ctx.fillStyle = '#ff6b2d'; ctx.beginPath(); ctx.arc(x, y + r*0.1, r*0.45, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#3fbf5a'; ctx.fillRect(x, y - r*0.55, r*0.3, r*0.2); }
 }
 const BONES=[[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
-function drawHand(p){
-  if (!p.hand.seen) return;
-  const col = mode==='duo' ? P_COLORS[p.idx] : '#8fe9ff';
-  if (p.pts){
-    ctx.lineCap='square';
-    ctx.strokeStyle=INK; ctx.lineWidth=12; for (const [a,b] of BONES){ ctx.beginPath(); ctx.moveTo(p.pts[a].x,p.pts[a].y); ctx.lineTo(p.pts[b].x,p.pts[b].y); ctx.stroke(); }
-    ctx.strokeStyle=col; ctx.lineWidth=6; for (const [a,b] of BONES){ ctx.beginPath(); ctx.moveTo(p.pts[a].x,p.pts[a].y); ctx.lineTo(p.pts[b].x,p.pts[b].y); ctx.stroke(); }
-    ctx.fillStyle='#fff'; for (const q of p.pts) ctx.fillRect(q.x-5,q.y-5,10,10);
+function drawHands(){
+  const hr = Math.min(W,H)*0.07;
+  for (const h of hands){
+    // รอยฟาด
+    for (let i=1;i<h.trail.length;i++){ const a = h.trail[i-1], b = h.trail[i]; if (b.s < W*0.25) continue;
+      ctx.strokeStyle = 'rgba(255,255,255,'+(i/h.trail.length)+')'; ctx.lineWidth = 24*i/h.trail.length; ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); }
+    if (h.pts){
+      ctx.lineCap='square';
+      ctx.strokeStyle=INK; ctx.lineWidth=12; for (const [a,b] of BONES){ ctx.beginPath(); ctx.moveTo(h.pts[a].x,h.pts[a].y); ctx.lineTo(h.pts[b].x,h.pts[b].y); ctx.stroke(); }
+      ctx.strokeStyle=h.col; ctx.lineWidth=6; for (const [a,b] of BONES){ ctx.beginPath(); ctx.moveTo(h.pts[a].x,h.pts[a].y); ctx.lineTo(h.pts[b].x,h.pts[b].y); ctx.stroke(); }
+    }
+    const fast = h.speed > W*0.25;
+    ctx.strokeStyle = INK; ctx.lineWidth = 14; ctx.strokeRect(h.x - hr*0.7, h.y - hr*0.7, hr*1.4, hr*1.4);
+    ctx.strokeStyle = fast ? '#ffcf33' : h.col; ctx.lineWidth = 6; ctx.strokeRect(h.x - hr*0.7, h.y - hr*0.7, hr*1.4, hr*1.4);
   }
-  const r = Math.min(W,H)*0.045;
-  ctx.fillStyle=INK; ctx.fillRect(p.hand.x-r-6, p.hand.y-r-6, r*2+12, 14); ctx.fillRect(p.hand.x-r-6, p.hand.y+r-8, r*2+12, 14);
-  ctx.fillRect(p.hand.x-r-6, p.hand.y-r-6, 14, r*2+12); ctx.fillRect(p.hand.x+r-8, p.hand.y-r-6, 14, r*2+12);
-  ctx.fillStyle = p.held ? '#ffcf33' : col;
-  ctx.fillRect(p.hand.x-r-2, p.hand.y-r-2, r*2+4, 6); ctx.fillRect(p.hand.x-r-2, p.hand.y+r-4, r*2+4, 6);
-  ctx.fillRect(p.hand.x-r-2, p.hand.y-r-2, 6, r*2+4); ctx.fillRect(p.hand.x+r-4, p.hand.y-r-2, 6, r*2+4);
-}
-function drawHUD(p){
-  const ctx = U, f = Math.max(18, Math.min(W,H)*0.04);
-  ctx.font = `800 ${f}px ${THAI}`; ctx.textBaseline='middle'; ctx.textAlign='left';
-  const remain = Math.max(0, GAME_TIME - playT);
-  const txt = mode==='solo' ? `เวลา ${Math.ceil(remain)}    ป้อนแล้ว ${p.score}` : `${P_NAMES[p.idx]}   ${p.score}`;
-  const w = ctx.measureText(txt).width + 36, x = mode==='solo' ? 16 : (p.idx===0 ? p.x0+16 : p.x1-16-w-8);
-  sticker(x, 16, w, f*1.7, mode==='duo' ? P_COLORS[p.idx] : PAPER);
-  ctx.fillStyle = mode==='duo' ? '#000' : '#fff'; ctx.fillText(txt, x+18, 16+f*0.85);
-  if (p.combo >= 2){
-    ctx.font = `800 ${f*0.8}px ${THAI}`;
-    const ct = `คอมโบ x${p.combo}`, cw = ctx.measureText(ct).width + 24;
-    const cx = mode==='solo' ? 16 : (p.idx===0 ? p.x0+16 : p.x1-16-cw-8);
-    sticker(cx, 16+f*1.7+18, cw, f*1.2, '#ffcf33');
-    ctx.fillStyle = '#000'; ctx.fillText(ct, cx+12, 16+f*1.7+18+f*0.6);
-  }
-}
-function drawDuoMiddle(){
-  const ctx = U;
-  ctx.strokeStyle='#fff'; ctx.lineWidth=4; ctx.setLineDash([14,12]);
-  ctx.beginPath(); ctx.moveTo(W/2,0); ctx.lineTo(W/2,H); ctx.stroke(); ctx.setLineDash([]);
-  const f = Math.max(16, Math.min(W,H)*0.035), remain = Math.max(0, GAME_TIME - playT);
-  const w = f*3.2;
-  sticker(W/2-w/2, 14, w, f*1.8, remain < 10 ? '#ff8e7a' : PAPER);
-  label(`${Math.ceil(remain)}`, W/2, 14+f*0.9, f*0.9, remain < 10 ? '#fff' : '#ffcf33');
-  label('VS', W/2, H*0.45, Math.min(W,H)*0.07, '#ffcf33');
-}
-function drawMsg(p, dt){
-  const m = p.msg; if (!m) return;
-  m.t -= dt; if (m.t <= 0){ p.msg = null; return; }
-  const ctx = U, pw = p.x1-p.x0, solo = mode==='solo';
-  const f = Math.max(18, Math.min(pw, H*1.6)*(solo?0.03:0.036));
-  const two = solo && m.text;
-  const w = Math.min(pw*0.88, 950), h = two ? f*3.3 : f*2, x = p.x0 + (pw-w)/2, y = solo ? H*0.13 : H*0.13;
-  ctx.globalAlpha = Math.min(1, m.t*2);
-  sticker(x, y, w, h, PAPER);
-  ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.font=`800 ${f}px ${THAI}`; ctx.fillStyle = m.ok ? '#7be39a' : '#ff6b5e';
-  ctx.fillText(m.title, x+w/2, y + (two ? f*1.05 : h/2), w-24);
-  if (two){ ctx.font=`${f*0.85}px ${THAI}`; ctx.fillStyle='#fff'; ctx.fillText(m.text, x+w/2, y+f*2.3, w-24); }
-  ctx.globalAlpha = 1;
 }
 function drawParticles(dt){
   for (const p of particles){
-    if (p.slow){ p.vx += (Math.random()-0.5)*40*dt; p.vy = Math.min(p.vy + 40*dt, 260); } else p.vy += 900*dt;
-    p.x += p.vx*dt; p.y += p.vy*dt; p.life -= dt*(p.slow?0.6:1.3);
+    p.vy += (p.g ?? 900)*dt; p.x += p.vx*dt; p.y += p.vy*dt; p.life -= dt*1.2;
     ctx.globalAlpha = Math.max(0, Math.min(1, p.life)); ctx.fillStyle = p.c;
-    const z = p.slow ? 12 : 12; ctx.fillRect(Math.round(p.x/4)*4, Math.round(p.y/4)*4, z, z);
+    const z = p.bub ? 20 : 12; ctx.fillRect(Math.round(p.x/4)*4, Math.round(p.y/4)*4, z, z);
   }
-  ctx.globalAlpha = 1; particles = particles.filter(p => p.life > 0 && p.y < H+40);
+  ctx.globalAlpha = 1; particles = particles.filter(p => p.life > 0 && p.y < H+40 && p.y > -60);
+}
+// ---------- UI ----------
+let banner = null;
+function drawHUD(){
+  const ctx = U, f = Math.max(17, Math.min(W,H)*0.036);
+  ctx.font = `800 ${f}px ${THAI}`; ctx.textBaseline='middle'; ctx.textAlign='left';
+  const txt = `ศึกที่ ${Math.min(wave+1,4)}/4    คะแนน ${score}`, w = ctx.measureText(txt).width + 36;
+  sticker(16, 16, w, f*1.7, PAPER); ctx.fillStyle = '#fff'; ctx.fillText(txt, 34, 16+f*0.85);
+  // พลังเมือง
+  const bw = Math.min(W*0.28, 340), bx = W - bw - 32, by = 16;
+  sticker(bx - f*4.2, by, bw + f*4.2 + 8, f*1.7, PAPER);
+  ctx.fillStyle = '#fff'; ctx.fillText('พลังเมือง', bx - f*3.9, by + f*0.85);
+  ctx.fillStyle = '#3a2f7a'; ctx.fillRect(bx, by + f*0.4, bw, f*0.9);
+  const seg = 10; for (let k=0;k<seg;k++){ if (cityHP > k*100/seg){ ctx.fillStyle = cityHP > 50 ? '#7be39a' : cityHP > 25 ? '#ffcf33' : '#ff6b5e'; ctx.fillRect(bx + 3 + k*bw/seg, by + f*0.4 + 3, bw/seg - 6, f*0.9 - 6); } }
+  // สถานะไอเท็ม
+  let iy = 16 + f*1.7 + 20;
+  const chip = (t, col)=>{ ctx.font = `800 ${f*0.75}px ${THAI}`; const w2 = ctx.measureText(t).width + 24; sticker(16, iy, w2, f*1.15, col); ctx.fillStyle = '#000'; ctx.fillText(t, 28, iy + f*0.58); iy += f*1.15 + 18; };
+  if (shieldT > 0) chip(`หน้ากากป้องกัน ${Math.ceil(shieldT)}`, '#8fd3ff');
+  if (slowT > 0) chip(`วัคซีน เชื้อโรคช้าลง ${Math.ceil(slowT)}`, '#ffcf33');
+  if (combo >= 2) chip(`คอมโบ x${combo}`, '#ff8ec3');
+  // หลอดบอส
+  if (boss && !boss.dead){
+    const w3 = Math.min(W*0.5, 600), x3 = (W - w3)/2, y3 = 16 + f*1.7 + 30;
+    label('จอมโรคห่า', W/2, y3 - 4, f*0.9, '#ff6b5e');
+    ctx.fillStyle = '#000'; ctx.fillRect(x3 - 4, y3 + f*0.5 - 4, w3 + 8, f*0.7 + 8);
+    ctx.fillStyle = '#3a2f7a'; ctx.fillRect(x3, y3 + f*0.5, w3, f*0.7);
+    ctx.fillStyle = '#ff6b5e'; ctx.fillRect(x3, y3 + f*0.5, w3*boss.hp/boss.max, f*0.7);
+  }
+}
+function drawFact(dt){
+  if (!fact) return;
+  fact.t -= dt; if (fact.t <= 0){ fact = null; return; }
+  const ctx = U, f = Math.max(18, Math.min(W,H)*0.032), w = Math.min(W*0.8, 900), h = f*3.2, x = (W - w)/2, y = H*0.2;
+  ctx.globalAlpha = Math.min(1, fact.t*2);
+  sticker(x, y, w, h, PAPER);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = `800 ${f}px ${THAI}`; ctx.fillStyle = fact.col; ctx.fillText(`ได้${fact.title}!`, W/2, y + f*0.95, w - 24);
+  ctx.font = `${f*0.85}px ${THAI}`; ctx.fillStyle = '#fff'; ctx.fillText(fact.text, W/2, y + f*2.2, w - 24);
+  ctx.globalAlpha = 1;
+}
+function drawFloaters(dt){
+  for (const f of floaters){ f.t -= dt; f.y -= 60*dt; U.globalAlpha = Math.max(0, Math.min(1, f.t*2)); label(f.text, f.x, f.y, Math.max(18, Math.min(W,H)*0.035), f.col); }
+  U.globalAlpha = 1; floaters = floaters.filter(f => f.t > 0);
+}
+function drawBanner(dt){
+  if (!banner) return;
+  banner.t -= dt; if (banner.t <= 0){ banner = null; return; }
+  const s = 1 + Math.max(0, banner.t - 1.6)*1.5;
+  label(banner.text, W/2, H*0.36, Math.min(W,H)*0.07*s, '#ffcf33');
+  if (banner.sub) label(banner.sub, W/2, H*0.36 + Math.min(W,H)*0.075, Math.min(W,H)*0.04, '#fff');
+}
+function drawIntro(dt){
+  intro -= dt;
+  const Wv = WAVES[wave], f = Math.min(W,H)*0.04, w = Math.min(W*0.82, 920), h = f*4.4, x = (W-w)/2, y = H*0.2;
+  sticker(x, y, w, h, PAPER);
+  label(Wv.title, W/2, y + f*1.4, f*1.4, Wv.boss ? '#ff6b5e' : '#ffcf33');
+  const ctx = U; ctx.font = `${f*0.78}px ${THAI}`; ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(Wv.fact, W/2, y + f*3.2, w - 30);
 }
 function drawCountdown(dt){
   countdown -= dt;
   const n = Math.ceil(countdown);
   if (n !== lastBeep && n >= 1){ sfx.beep(); lastBeep = n; }
-  if (countdown <= 0){
-    sfx.go(); state = 'play'; playT = 0; players.forEach(nextItem); banner = {text:'ไป!', t:0.8};
+  if (countdown <= 0){ sfx.go(); state = 'play'; beginWave(); return; }
+  const frac = countdown - Math.floor(countdown);
+  label(String(n), W/2, H*0.32, Math.min(W,H)*(0.2 + 0.07*frac), '#ffcf33');
+  label('ยกมือขึ้น เตรียมรบ!', W/2, H*0.5, Math.min(W,H)*0.05);
+}
+
+// ---------- ศึก ----------
+function updateWave(dt){
+  if (intro > 0) return;
+  waveT += dt;
+  const Wv = WAVES[wave];
+  if (Wv.boss){
+    if (!boss && !Wv.spawnedBoss){ Wv.spawnedBoss = true; boss = spawnGerm('boss', 'right'); boss.boat = false; boss.y = H*0.5; sfx.roar(); banner = {text:'จอมโรคห่ามาแล้ว!', sub:'ฟาดแรง ๆ หลายที!', t:2.2}; }
+    if (bossKilled){ germs.forEach(g => { if (!g.dead){ g.dead = true; burst(g.x, g.y, germColors(g.type), 10); } }); germs = []; win(); }
     return;
   }
-  const frac = countdown - Math.floor(countdown);
-  label(String(n), W/2, H*0.36, Math.min(W,H)*(0.2 + 0.07*frac), '#ffcf33');
-  label(mode==='duo' ? 'ยืนคนละฝั่ง แล้วยกมือขึ้น!' : 'มอนสเตอร์หิวแล้ว ยกมือขึ้นเลย!', W/2, H*0.55, Math.min(W,H)*0.05);
+  if (spawned < Wv.n){
+    nextSpawn -= dt;
+    if (nextSpawn <= 0){
+      spawnGerm(pickType(Wv.mix)); spawned++;
+      const k = spawned / Wv.n; nextSpawn = Wv.gap[0] + (Wv.gap[1] - Wv.gap[0])*k;
+    }
+  } else if (!germs.length){ wave++; if (wave < WAVES.length) beginWave(); }
 }
-function drawBanner(dt){
-  if (!banner) return;
-  if (banner.p){ const p = banner.p, s = 1 + Math.sin(performance.now()/180)*0.06;
-    label('ชนะ!', (p.x0+p.x1)/2, H*0.36, Math.min(W,H)*0.16*s, P_COLORS[p.idx]); return; }
-  banner.t -= dt; if (banner.t <= 0){ banner = null; return; }
-  label(banner.text, W/2, H*0.38, Math.min(W,H)*0.22*(1+(0.8-banner.t)*0.4), '#7be39a');
+function win(){
+  if (state !== 'play') return;
+  state = 'over'; sfx.win();
+  const cols = ['#ff5fa2','#3fb6ff','#ffcf33','#7be39a','#ffffff','#b48cff'];
+  for (let i=0;i<240;i++) particles.push({x:Math.random()*W, y:-20-Math.random()*H*0.5, vx:(Math.random()-0.5)*120, vy:100+Math.random()*200, c:cols[i%6], life:3.5, g:30});
+  const title = bestCombo >= 20 ? RANKS[0][1] : bestCombo >= 10 ? RANKS[1][1] : bestCombo >= 5 ? RANKS[2][1] : 'ทหารภูมิคุ้มกัน';
+  setTimeout(()=>{
+    pixelTitle(document.getElementById('endTitle'), 'กรุงศรีปลอดภัย!', '#7be39a');
+    document.getElementById('endText').innerHTML = `ได้รับยศ <b style="color:#ffcf33">${title}</b><br>คะแนน <b>${score}</b> · ปราบเชื้อโรค ${kills} ตัว · คอมโบสูงสุด x${bestCombo} · พลังเมืองเหลือ ${cityHP}%` +
+      `<br><span style="font-size:.85em">จำไว้นะ: ล้างมือด้วยสบู่ · ใส่หน้ากากเมื่อป่วย · ฉีดวัคซีน · กินผักผลไม้ ภูมิคุ้มกันจะแข็งแรง!</span>`;
+    document.getElementById('end').classList.remove('hidden');
+  }, 1500);
+}
+function lose(){
+  if (state !== 'play') return;
+  state = 'over'; sfx.lose();
+  setTimeout(()=>{
+    pixelTitle(document.getElementById('endTitle'), 'กรุงแตกแล้ว!', '#ff6b5e');
+    document.getElementById('endText').innerHTML = `ไปได้ถึง${WAVES[Math.min(wave,3)].title.split(':')[0]} · คะแนน <b>${score}</b> · ปราบเชื้อโรค ${kills} ตัว` +
+      `<br><span style="font-size:.85em">ไม่เป็นไร! ลองใหม่อีกรอบ คว้าสบู่กับผลไม้ช่วยด้วยนะ</span>`;
+    document.getElementById('end').classList.remove('hidden');
+  }, 1200);
 }
 
 function loop(t){
   const dt = Math.min(0.05, (t-lastT)/1000 || 0); lastT = t;
-  trackHands(); U.clearRect(0,0,W,H); drawBG(t);
-  if (state !== 'menu' && players.length){
+  trackHands(t); U.clearRect(0,0,W,H);
+  const sh = shake > 0 ? (Math.random()-0.5)*shake*40 : 0; shake = Math.max(0, shake - dt);
+  ctx.setTransform(1/PX,0,0,1/PX,sh/PX,0);
+  drawBG(t);
+  if (state !== 'menu'){
     if (state === 'play'){
-      playT += dt;
-      players.forEach(p => updatePlayer(p, dt));
-      if (playT >= GAME_TIME){ players.forEach(p => p.held = false); endGame(); }
+      updateWave(dt);
+      if (intro <= 0){
+        updateGerms(dt); updateItems(dt); handleSwats();
+        itemTimer -= dt; if (itemTimer <= 0){ spawnItem(); itemTimer = 10 + Math.random()*6; }
+        shieldT = Math.max(0, shieldT - dt); slowT = Math.max(0, slowT - dt);
+        comboT -= dt; if (comboT <= 0) combo = 0;
+        drumT -= dt; if (drumT <= 0){ sfx.drum(); drumT = WAVES[wave] && WAVES[wave].boss ? 0.4 : 0.7; }
+        if (cityHP <= 0) lose();
+      }
     }
-    if (mode === 'duo') drawDuoMiddle();
-    players.forEach(p => p.mons.forEach(m => drawMonster(m, p, t)));
-    players.forEach(drawMonsterLabels);
-    if (state === 'play'){ players.forEach(drawItem); players.forEach(drawItemLabel); }
-    players.forEach(drawHUD);
-    players.forEach(p => drawMsg(p, dt));
+    for (let i=0;i<cough.length;i++) cough[i] = Math.max(0, cough[i] - dt);
+    drawCity(t);
+    germs.forEach(g => drawGerm(g, t));
+    items.forEach(it => drawItem(it, t));
+    if (state === 'play' || state === 'over') drawHUD();
+    drawFloaters(dt); drawFact(dt); drawBanner(dt);
     if (state === 'countdown') drawCountdown(dt);
-    drawBanner(dt);
+    if (state === 'play' && intro > 0) drawIntro(dt);
   }
   drawParticles(dt);
-  players.forEach(drawHand);
+  drawHands();
   requestAnimationFrame(loop);
 }
 function pixelTitle(el, text, color='#ffcf33'){
@@ -542,8 +592,8 @@ function pixelTitle(el, text, color='#ffcf33'){
   c.style.width = c.width*scale + 'px'; c.style.height = c.height*scale + 'px';
   el.innerHTML = ''; el.appendChild(c);
 }
-window.__p = () => players;
-document.fonts.ready.then(()=> pixelTitle(document.querySelector('#start h1'), 'มอนสเตอร์หิวขยะ!', '#7be39a'));
+window.__g = () => ({germs, items, wave, intro, state, cityHP, score, kills, boss, WAVES});
+document.fonts.ready.then(()=> pixelTitle(document.querySelector('#start h1'), 'ศึกพิทักษ์กรุงศรี!', '#ffcf33'));
 resize(); initHands(); requestAnimationFrame(loop);
 </script>
 </body>
